@@ -384,12 +384,27 @@ with st.sidebar:
     if current_model not in prov_models:
         current_model = DEFAULT_MODELS[current_prov]
 
-    selected_model = st.selectbox(
+    model_options = list(prov_models) + ["✏️ Custom Model..."]
+    default_idx = model_options.index(current_model) if current_model in model_options else (len(model_options) - 1 if current_model else 0)
+
+    selected_model_choice = st.selectbox(
         "Model:",
-        options=prov_models,
-        index=prov_models.index(current_model) if current_model in prov_models else 0,
+        options=model_options,
+        index=default_idx,
         key="model_selector",
     )
+    if selected_model_choice == "✏️ Custom Model...":
+        custom_model = st.text_input(
+            "Custom Model ID:",
+            value=st.session_state.get("custom_model_input", ""),
+            placeholder="e.g. gemini-2.5-flash or openai/gpt-oss-120b",
+            key="custom_model_widget",
+        )
+        selected_model = custom_model.strip() if custom_model.strip() else DEFAULT_MODELS[current_prov]
+        st.session_state.custom_model_input = selected_model
+    else:
+        selected_model = selected_model_choice
+
     if selected_model != st.session_state.get("selected_llm_model"):
         st.session_state.selected_llm_model = selected_model
         clear_llm_cache()

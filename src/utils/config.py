@@ -44,29 +44,34 @@ GEMINI_API_KEY:  str   = _get_env("GEMINI_API_KEY") or _get_env("GOOGLE_API_KEY"
 LLM_PROVIDER:    str   = _get_env("LLM_PROVIDER", "auto").lower()
 
 DEFAULT_MODELS = {
-    "groq": "llama-3.3-70b-versatile",
-    "gemini": "gemini-2.0-flash",
+    "groq": "openai/gpt-oss-20b",
+    "gemini": "gemini-2.5-flash",
 }
 
 AVAILABLE_MODELS = {
     "groq": [
-        "llama-3.3-70b-versatile",
-        "llama3-8b-8192",
         "openai/gpt-oss-20b",
-        "gemma2-9b-it",
-        "mixtral-8x7b-32768",
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+        "groq/compound",
+        "groq/compound-mini",
+        "canopylabs/orpheus-v1-english",
+        "allam-2-7b",
     ],
     "gemini": [
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
         "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
     ],
 }
 
 raw_model = _get_env("LLM_MODEL", "")
-if raw_model in ("llama-3.1-8b-instant", "llama3-8b-instant"):
-    logger.warning("llama-3.1-8b-instant is deprecated by Groq. Upgrading default to llama-3.3-70b-versatile.")
-    LLM_MODEL: str = "llama-3.3-70b-versatile"
+if raw_model in ("llama-3.1-8b-instant", "llama3-8b-instant", "llama-3.3-70b-versatile", "llama3-8b-8192"):
+    logger.info("Upgrading model to openai/gpt-oss-20b.")
+    LLM_MODEL: str = "openai/gpt-oss-20b"
 else:
     LLM_MODEL: str = raw_model or DEFAULT_MODELS["groq"]
 
@@ -104,10 +109,13 @@ CONFIDENCE_THRESHOLD_LEGAL: float = float(_get_env("CONFIDENCE_THRESHOLD_LEGAL",
 def normalize_model_name(provider: str, model_name: str) -> str:
     """Normalize and upgrade deprecated model names."""
     if not model_name:
-        return DEFAULT_MODELS.get(provider, "llama-3.3-70b-versatile")
-    if provider == "groq" and model_name in ("llama-3.1-8b-instant", "llama3-8b-instant"):
-        logger.warning("llama-3.1-8b-instant is deprecated by Groq. Upgrading to llama-3.3-70b-versatile.")
-        return "llama-3.3-70b-versatile"
+        return DEFAULT_MODELS.get(provider, "openai/gpt-oss-20b")
+    if provider == "groq" and model_name in (
+        "llama-3.1-8b-instant", "llama3-8b-instant",
+        "llama-3.3-70b-versatile", "llama3-8b-8192"
+    ):
+        logger.info(f"Model {model_name} mapped to {DEFAULT_MODELS['groq']} for current Groq catalog.")
+        return DEFAULT_MODELS["groq"]
     return model_name
 
 
