@@ -19,7 +19,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.graph.workflow import run_full_analysis, run_qa, reset_retriever, run_case_research
-from src.utils.config import check_api_connection
+from src.utils.config import (
+    check_api_connection,
+    get_active_provider_and_model,
+    AVAILABLE_MODELS,
+    DEFAULT_MODELS,
+    clear_llm_cache,
+)
 from src.utils.s3_storage import (
     upload_pdf_to_s3,
     upload_text_to_s3,
@@ -346,12 +352,81 @@ with st.sidebar:
 
     st.markdown("---")
 
-    st.markdown("### 🔌 API Status")
+    st.markdown("### 🔌 AI Provider & Model")
+
+    active_prov, active_mod = get_active_provider_and_model()
+
+    provider_display_map = {
+        "groq": "⚡ Groq (Fast & Free)",
+        "gemini": "✨ Google Gemini (Free Tier)",
+    }
+    provider_keys = ["groq", "gemini"]
+
+    if "selected_llm_provider" not in st.session_state:
+        st.session_state.selected_llm_provider = active_prov
+
+    selected_prov_display = st.selectbox(
+        "LLM Provider:",
+        options=[provider_display_map[p] for p in provider_keys],
+        index=provider_keys.index(st.session_state.selected_llm_provider)
+        if st.session_state.selected_llm_provider in provider_keys
+        else 0,
+        key="prov_selector",
+    )
+    current_prov = [k for k, v in provider_display_map.items() if v == selected_prov_display][0]
+    if current_prov != st.session_state.selected_llm_provider:
+        st.session_state.selected_llm_provider = current_prov
+        st.session_state.selected_llm_model = DEFAULT_MODELS[current_prov]
+        clear_llm_cache()
+
+    prov_models = AVAILABLE_MODELS.get(current_prov, [DEFAULT_MODELS[current_prov]])
+    current_model = st.session_state.get("selected_llm_model", DEFAULT_MODELS[current_prov])
+    if current_model not in prov_models:
+        current_model = DEFAULT_MODELS[current_prov]
+
+    selected_model = st.selectbox(
+        "Model:",
+        options=prov_models,
+        index=prov_models.index(current_model) if current_model in prov_models else 0,
+        key="model_selector",
+    )
+    if selected_model != st.session_state.get("selected_llm_model"):
+        st.session_state.selected_llm_model = selected_model
+        clear_llm_cache()
+
+    with st.expander("🔑 API Key Settings", expanded=False):
+        if current_prov == "gemini":
+            st.caption("Free Google Gemini API key: [Google AI Studio](https://aistudio.google.com/app/apikey)")
+            gemini_input = st.text_input(
+                "Gemini API Key:",
+                type="password",
+                value=st.session_state.get("gemini_api_key_input", ""),
+                help="Enter your Gemini API key or set GEMINI_API_KEY in .env / Streamlit Secrets",
+                key="gemini_key_widget",
+            )
+            if gemini_input:
+                if gemini_input != st.session_state.get("gemini_api_key_input"):
+                    st.session_state.gemini_api_key_input = gemini_input
+                    clear_llm_cache()
+        else:
+            st.caption("Free Groq API key: [Groq Console](https://console.groq.com/keys)")
+            groq_input = st.text_input(
+                "Groq API Key:",
+                type="password",
+                value=st.session_state.get("groq_api_key_input", ""),
+                help="Enter your Groq API key or set GROQ_API_KEY in .env / Streamlit Secrets",
+                key="groq_key_widget",
+            )
+            if groq_input:
+                if groq_input != st.session_state.get("groq_api_key_input"):
+                    st.session_state.groq_api_key_input = groq_input
+                    clear_llm_cache()
+
     if st.button("Check Connection", use_container_width=True):
-        with st.spinner("Checking…"):
-            ok, msg = check_api_connection()
+        with st.spinner("Testing connection…"):
+            ok, msg = check_api_connection(provider=current_prov, model=selected_model)
             if ok:
-                st.success("✅ Connected to Groq API")
+                st.success(f"✅ {msg}")
             else:
                 st.error(f"❌ {msg}")
 
@@ -486,7 +561,7 @@ with st.sidebar:
     st.markdown("""
     - **Embeddings**: `sentence-transformers`
     - **Vector DB**: `FAISS`
-    - **LLM**: `Groq (Llama 3.1)`
+    - **LLM**: `Groq (Llama 3.3) / Google Gemini`
     - **Workflow**: `LangGraph`
     - **Chains**: `LangChain`
     - **Storage**: `AWS S3`

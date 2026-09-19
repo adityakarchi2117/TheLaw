@@ -17,7 +17,7 @@ class SimplificationError(Exception):
 @dataclass
 class SimplificationConfig:
     """Configuration for the simplification module."""
-    model: str = "llama-3.1-8b-instant"
+    model: str = "llama-3.3-70b-versatile"
     temperature: float = 0.3
     max_tokens: int = 1500
     max_retries: int = 3
@@ -204,7 +204,7 @@ def check_api_connection() -> Tuple[bool, str]:
         
         # Quick test call
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": "Say 'OK'"}],
             max_tokens=5
         )

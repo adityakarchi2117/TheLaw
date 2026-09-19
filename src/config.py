@@ -22,7 +22,7 @@ class LLMConfig:
     """Configuration for LLM providers."""
     
     # Groq (default provider - fast & free tier available)
-    groq_model: str = "llama-3.1-8b-instant"
+    groq_model: str = "llama-3.3-70b-versatile"
     groq_temperature: float = 0.3
     groq_max_tokens: int = 1500
     
