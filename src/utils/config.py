@@ -45,7 +45,7 @@ LLM_PROVIDER:    str   = _get_env("LLM_PROVIDER", "auto").lower()
 
 DEFAULT_MODELS = {
     "groq": "openai/gpt-oss-20b",
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.6-flash",
 }
 
 AVAILABLE_MODELS = {
@@ -59,19 +59,22 @@ AVAILABLE_MODELS = {
         "allam-2-7b",
     ],
     "gemini": [
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-flash-latest",
+        "gemma-4-26b-a4b-it",
     ],
 }
 
 raw_model = _get_env("LLM_MODEL", "")
 if raw_model in ("llama-3.1-8b-instant", "llama3-8b-instant", "llama-3.3-70b-versatile", "llama3-8b-8192"):
-    logger.info("Upgrading model to openai/gpt-oss-20b.")
+    logger.info("Upgrading Groq model to openai/gpt-oss-20b.")
     LLM_MODEL: str = "openai/gpt-oss-20b"
+elif raw_model in ("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"):
+    logger.info("Upgrading Gemini model to gemini-3.6-flash.")
+    LLM_MODEL: str = "gemini-3.6-flash"
 else:
     LLM_MODEL: str = raw_model or DEFAULT_MODELS["groq"]
 
@@ -110,13 +113,26 @@ def normalize_model_name(provider: str, model_name: str) -> str:
     """Normalize and upgrade deprecated model names."""
     if not model_name:
         return DEFAULT_MODELS.get(provider, "openai/gpt-oss-20b")
-    if provider == "groq" and model_name in (
+    
+    # Strip any models/ prefix if passed (e.g. from Google API)
+    clean_model = model_name.removeprefix("models/").strip()
+
+    if provider == "groq" and clean_model in (
         "llama-3.1-8b-instant", "llama3-8b-instant",
         "llama-3.3-70b-versatile", "llama3-8b-8192"
     ):
-        logger.info(f"Model {model_name} mapped to {DEFAULT_MODELS['groq']} for current Groq catalog.")
+        logger.info(f"Model {clean_model} mapped to {DEFAULT_MODELS['groq']} for current Groq catalog.")
         return DEFAULT_MODELS["groq"]
-    return model_name
+
+    if provider == "gemini" and clean_model in (
+        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite",
+        "gemini-2.0-flash", "gemini-2.0-flash-exp",
+        "gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"
+    ):
+        logger.info(f"Model {clean_model} mapped to {DEFAULT_MODELS['gemini']} (current active Gemini tier).")
+        return DEFAULT_MODELS["gemini"]
+
+    return clean_model
 
 
 def _get_api_key_for_provider(provider: str) -> str:
@@ -163,8 +179,10 @@ def get_active_provider_and_model(provider: str = None, model: str = None) -> tu
     mod = model or session_model or LLM_MODEL or DEFAULT_MODELS.get(prov, "llama-3.3-70b-versatile")
     mod = normalize_model_name(prov, mod)
 
-    # Ensure model matches provider
-    if prov == "gemini" and mod not in AVAILABLE_MODELS.get("gemini", []):
+    # Ensure model matches provider (allow custom model if user entered one)
+    if session_model and session_model not in AVAILABLE_MODELS.get(prov, []):
+        mod = session_model
+    elif prov == "gemini" and mod not in AVAILABLE_MODELS.get("gemini", []):
         mod = DEFAULT_MODELS["gemini"]
     elif prov == "groq" and mod not in AVAILABLE_MODELS.get("groq", []):
         mod = DEFAULT_MODELS["groq"]
